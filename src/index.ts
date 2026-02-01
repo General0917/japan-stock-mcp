@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 import { StockAnalyzer } from './stock-analyzer.js';
 import { StockAPIClient } from './stock-api.js';
+import { FundamentalsAPIClient } from './fundamentals-api.js';
 
 // Zodスキーマ定義
 const GetStockPriceSchema = z.object({
@@ -31,16 +32,25 @@ const FindBestStocksSchema = z.object({
   topN: z.number().optional().describe('上位N銘柄を返す（デフォルト: 5）'),
 });
 
+const GetFundamentalsSchema = z.object({
+  symbol: z.string().describe('銘柄コード（例: 7203 トヨタ自動車）'),
+});
+
+const ComprehensiveAnalysisSchema = z.object({
+  symbol: z.string().describe('銘柄コード（例: 7203 トヨタ自動車）'),
+});
+
 class JapanStockMCPServer {
   private server: Server;
   private analyzer: StockAnalyzer;
   private apiClient: StockAPIClient;
+  private fundamentalsClient: FundamentalsAPIClient;
 
   constructor() {
     this.server = new Server(
       {
         name: 'japan-stock-mcp-server',
-        version: '1.0.0',
+        version: '2.0.0',
       },
       {
         capabilities: {
@@ -51,6 +61,7 @@ class JapanStockMCPServer {
 
     this.analyzer = new StockAnalyzer();
     this.apiClient = new StockAPIClient();
+    this.fundamentalsClient = new FundamentalsAPIClient();
 
     this.setupToolHandlers();
     
@@ -152,6 +163,34 @@ class JapanStockMCPServer {
             required: ['symbol'],
           },
         },
+        {
+          name: 'get_fundamentals',
+          description: '企業の財務データとファンダメンタルズ分析を取得します。PER、PBR、ROE、配当利回り、財務健全性、バリュエーション、収益性の評価を返します。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              symbol: {
+                type: 'string',
+                description: '銘柄コード（例: 7203 トヨタ自動車）',
+              },
+            },
+            required: ['symbol'],
+          },
+        },
+        {
+          name: 'analyze_comprehensive',
+          description: 'テクニカル分析とファンダメンタルズ分析を統合した総合分析を行います。株価のトレンドと企業業績の両面から投資判断を提供します。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              symbol: {
+                type: 'string',
+                description: '銘柄コード（例: 7203 トヨタ自動車）',
+              },
+            },
+            required: ['symbol'],
+          },
+        },
       ];
 
       return { tools };
@@ -175,6 +214,12 @@ class JapanStockMCPServer {
 
           case 'get_current_price':
             return await this.handleGetCurrentPrice(request.params.arguments);
+
+          case 'get_fundamentals':
+            return await this.handleGetFundamentals(request.params.arguments);
+
+          case 'analyze_comprehensive':
+            return await this.handleAnalyzeComprehensive(request.params.arguments);
 
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
@@ -220,7 +265,7 @@ class JapanStockMCPServer {
     const analysis = await this.analyzer.analyzeStock(symbol);
 
     const text = `# ${symbol} 株価分析レポート\n\n` +
-      `現在価格: ${analysis.currentPrice.toFixed(2)}円\n\n` +
+      `現在価格: ${(analysis.currentPrice ?? 0).toFixed(2)}円\n\n` +
       `## テクニカル指標\n` +
       `- RSI(14): ${analysis.technicalIndicators.rsi.toFixed(2)}\n` +
       `- MACD: ${analysis.technicalIndicators.macd.toFixed(2)}\n` +
@@ -336,6 +381,106 @@ class JapanStockMCPServer {
       `前日比: ${info.change >= 0 ? '+' : ''}${info.change.toFixed(2)}円\n` +
       `変動率: ${info.changePercent >= 0 ? '+' : ''}${info.changePercent.toFixed(2)}%\n` +
       `出来高: ${info.volume.toLocaleString()}株`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text,
+        },
+      ],
+    };
+  }
+
+  private async handleGetFundamentals(args: unknown) {
+    const { symbol } = GetFundamentalsSchema.parse(args);
+    const financialData = await this.fundamentalsClient.getFinancialData(symbol);
+    const analysis = this.fundamentalsClient.analyzeFundamentals(financialData);
+
+    const formatCurrency = (val?: number | null) => val != null ? `${(val / 1e8).toFixed(0)}億円` : 'N/A';
+    const formatPercent = (val?: number | null) => val != null ? `${val.toFixed(2)}%` : 'N/A';
+    const formatNumber = (val?: number | null) => val != null ? val.toFixed(2) : 'N/A';
+
+    const text = `# ${financialData.companyName} (${symbol}) ファンダメンタルズ分析\n\n` +
+      `## 総合評価\n` +
+      `- **推奨: ${analysis.recommendation}**\n` +
+      `- 総合スコア: ${analysis.overallScore}/100\n\n` +
+      `## バリュエーション (${analysis.valuation.rating})\n` +
+      `- スコア: ${analysis.valuation.score}/100\n` +
+      `- PER: ${formatNumber(financialData.per)}\n` +
+      `- PBR: ${formatNumber(financialData.pbr)}\n` +
+      `- 配当利回り: ${formatPercent(financialData.dividendYield)}\n` +
+      `- 評価理由:\n${analysis.valuation.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `## 財務健全性 (${analysis.financialHealth.rating})\n` +
+      `- スコア: ${analysis.financialHealth.score}/100\n` +
+      `- ROE: ${formatPercent(financialData.roe)}\n` +
+      `- 負債比率: ${formatNumber(financialData.debtToEquity)}\n` +
+      `- 流動比率: ${formatNumber(financialData.currentRatio)}\n` +
+      `- 評価理由:\n${analysis.financialHealth.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `## 収益性 (${analysis.profitability.rating})\n` +
+      `- スコア: ${analysis.profitability.score}/100\n` +
+      `- 営業利益率: ${formatPercent(financialData.operatingMargin)}\n` +
+      `- 純利益率: ${formatPercent(financialData.profitMargin)}\n` +
+      `- EPS: ${formatNumber(financialData.eps)}円\n` +
+      `- 評価理由:\n${analysis.profitability.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `## 財務データ\n` +
+      `- 時価総額: ${formatCurrency(financialData.marketCap)}\n` +
+      `- 売上高: ${formatCurrency(financialData.revenue)}\n` +
+      `- 純利益: ${formatCurrency(financialData.netIncome)}\n` +
+      `- 総資産: ${formatCurrency(financialData.totalAssets)}\n` +
+      `- 総負債: ${formatCurrency(financialData.totalDebt)}`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text,
+        },
+      ],
+    };
+  }
+
+  private async handleAnalyzeComprehensive(args: unknown) {
+    const { symbol } = ComprehensiveAnalysisSchema.parse(args);
+    const analysis = await this.analyzer.analyzeComprehensive(symbol);
+
+    const text = `# ${analysis.companyName} (${symbol}) 総合分析レポート\n\n` +
+      `## 📊 総合評価\n` +
+      `- **推奨: ${analysis.overallRecommendation}**\n` +
+      `- 総合スコア: ${analysis.overallScore}/100\n\n` +
+      `## 💡 投資サマリー\n` +
+      analysis.investmentSummary.map(s => `- ${s}`).join('\n') + '\n\n' +
+      `## 💰 ファンダメンタルズ分析\n` +
+      `### 総合評価: ${analysis.fundamentals.recommendation}\n` +
+      `- バリュエーション: ${analysis.fundamentals.valuation.rating} (${analysis.fundamentals.valuation.score}/100)\n` +
+      `- 財務健全性: ${analysis.fundamentals.financialHealth.rating} (${analysis.fundamentals.financialHealth.score}/100)\n` +
+      `- 収益性: ${analysis.fundamentals.profitability.rating} (${analysis.fundamentals.profitability.score}/100)\n\n` +
+      `### 主要財務指標\n` +
+      `- PER: ${analysis.financialData.per?.toFixed(2) || 'N/A'}\n` +
+      `- PBR: ${analysis.financialData.pbr?.toFixed(2) || 'N/A'}\n` +
+      `- ROE: ${analysis.financialData.roe?.toFixed(2) || 'N/A'}%\n` +
+      `- 配当利回り: ${analysis.financialData.dividendYield?.toFixed(2) || 'N/A'}%\n` +
+      `- 営業利益率: ${analysis.financialData.operatingMargin?.toFixed(2) || 'N/A'}%\n\n` +
+      `## 📈 テクニカル分析\n` +
+      `現在価格: ${(analysis.currentPrice ?? 0).toFixed(2)}円\n\n` +
+      `### 短期（1ヶ月以内）\n` +
+      `- シグナル: **${analysis.technical.shortTerm.signal}**\n` +
+      `- スコア: ${analysis.technical.shortTerm.score}/100\n` +
+      `- 理由:\n${analysis.technical.shortTerm.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `### 中期（3-6ヶ月）\n` +
+      `- シグナル: **${analysis.technical.mediumTerm.signal}**\n` +
+      `- スコア: ${analysis.technical.mediumTerm.score}/100\n` +
+      `- 理由:\n${analysis.technical.mediumTerm.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `### 長期（6ヶ月以上）\n` +
+      `- シグナル: **${analysis.technical.longTerm.signal}**\n` +
+      `- スコア: ${analysis.technical.longTerm.score}/100\n` +
+      `- 理由:\n${analysis.technical.longTerm.reasons.map(r => `  - ${r}`).join('\n')}\n\n` +
+      `### テクニカル指標\n` +
+      `- RSI: ${(analysis.technical.indicators.rsi ?? 0).toFixed(2)}\n` +
+      `- MACD: ${(analysis.technical.indicators.macd ?? 0).toFixed(2)}\n` +
+      `- 20日移動平均: ${(analysis.technical.indicators.sma20 ?? 0).toFixed(2)}円\n` +
+      `- 50日移動平均: ${(analysis.technical.indicators.sma50 ?? 0).toFixed(2)}円\n` +
+      `- 200日移動平均: ${(analysis.technical.indicators.sma200 ?? 0).toFixed(2)}円`;
 
     return {
       content: [

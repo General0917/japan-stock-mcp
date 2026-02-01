@@ -8,7 +8,7 @@ echo ""
 # 現在のディレクトリを取得
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-echo "1. 依存パッケージをインストール中..."
+echo "1. Node.js依存パッケージをインストール中..."
 npm install
 
 if [ $? -ne 0 ]; then
@@ -17,7 +17,34 @@ if [ $? -ne 0 ]; then
 fi
 
 echo ""
-echo "2. TypeScriptをビルド中..."
+echo "2. Python依存パッケージをインストール中..."
+echo "   (ファンダメンタルズ分析に必要)"
+
+# Pythonがインストールされているか確認
+if command -v python3 &> /dev/null; then
+    echo "   Python3が見つかりました"
+    
+    # yfinanceをインストール
+    pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt
+    
+    if [ $? -eq 0 ]; then
+        echo "   ✓ yfinanceのインストールに成功しました"
+    else
+        echo "   ⚠ yfinanceのインストールに失敗しました"
+        echo "   手動でインストールしてください: pip3 install yfinance"
+        echo "   （ファンダメンタルズ分析は利用できますが、精度が低下する可能性があります）"
+    fi
+else
+    echo "   ⚠ Python3が見つかりません"
+    echo "   ファンダメンタルズ分析を使用するには、Python3とyfinanceが必要です"
+    echo "   インストール方法:"
+    echo "   - macOS: brew install python3"
+    echo "   - Ubuntu: sudo apt install python3 python3-pip"
+    echo "   その後: pip3 install yfinance"
+fi
+
+echo ""
+echo "3. TypeScriptをビルド中..."
 npm run build
 
 if [ $? -ne 0 ]; then
@@ -63,6 +90,6 @@ echo "3. 動作確認（オプション）:"
 echo "   npm run inspector"
 echo ""
 echo "使用例:"
-echo "  「トヨタ自動車（7203）を分析してください」"
-echo "  「短期で有望な銘柄TOP5を教えてください: 7203, 6758, 9984, 8306, 9432」"
+echo "  「トヨタ自動車（7203）を総合分析してください」"
+echo "  「ソニーグループ（6758）のファンダメンタルズを分析してください」"
 echo "========================================"

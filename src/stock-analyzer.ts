@@ -1,4 +1,5 @@
 import { StockAPIClient, StockPrice, TechnicalIndicators } from './stock-api.js';
+import { FundamentalsAPIClient, FinancialData, FundamentalAnalysis } from './fundamentals-api.js';
 
 export interface AnalysisResult {
   symbol: string;
@@ -19,13 +20,33 @@ export interface AnalysisResult {
   };
   technicalIndicators: TechnicalIndicators;
   currentPrice: number;
+  fundamentals?: FundamentalAnalysis;
+}
+
+export interface ComprehensiveAnalysis {
+  symbol: string;
+  companyName: string;
+  currentPrice: number;
+  technical: {
+    shortTerm: AnalysisResult['shortTerm'];
+    mediumTerm: AnalysisResult['mediumTerm'];
+    longTerm: AnalysisResult['longTerm'];
+    indicators: TechnicalIndicators;
+  };
+  fundamentals: FundamentalAnalysis;
+  financialData: FinancialData;
+  overallScore: number;
+  overallRecommendation: 'STRONG_BUY' | 'BUY' | 'HOLD' | 'SELL' | 'STRONG_SELL';
+  investmentSummary: string[];
 }
 
 export class StockAnalyzer {
   private apiClient: StockAPIClient;
+  private fundamentalsClient: FundamentalsAPIClient;
 
   constructor() {
     this.apiClient = new StockAPIClient();
+    this.fundamentalsClient = new FundamentalsAPIClient();
   }
 
   /**
@@ -61,6 +82,118 @@ export class StockAnalyzer {
   }
 
   /**
+   * テクニカル分析とファンダメンタルズ分析を統合した総合分析
+   */
+  async analyzeComprehensive(symbol: string): Promise<ComprehensiveAnalysis> {
+    // テクニカル分析を実行
+    const technicalAnalysis = await this.analyzeStock(symbol);
+
+    // ファンダメンタルズデータを取得
+    const financialData = await this.fundamentalsClient.getFinancialData(symbol);
+
+    // ファンダメンタルズ分析を実行
+    const fundamentals = this.fundamentalsClient.analyzeFundamentals(financialData);
+
+    // 総合スコア計算（テクニカル50%、ファンダメンタルズ50%）
+    const technicalAvgScore = (
+      technicalAnalysis.shortTerm.score * 0.3 +
+      technicalAnalysis.mediumTerm.score * 0.3 +
+      technicalAnalysis.longTerm.score * 0.4
+    );
+    const overallScore = Math.round((technicalAvgScore + fundamentals.overallScore) / 2);
+
+    // 総合推奨レベル決定
+    let overallRecommendation: ComprehensiveAnalysis['overallRecommendation'];
+    if (overallScore >= 75) overallRecommendation = 'STRONG_BUY';
+    else if (overallScore >= 60) overallRecommendation = 'BUY';
+    else if (overallScore >= 40) overallRecommendation = 'HOLD';
+    else if (overallScore >= 25) overallRecommendation = 'SELL';
+    else overallRecommendation = 'STRONG_SELL';
+
+    // 投資サマリー作成
+    const investmentSummary = this.generateInvestmentSummary(
+      technicalAnalysis,
+      fundamentals,
+      financialData,
+      overallRecommendation
+    );
+
+    return {
+      symbol,
+      companyName: financialData.companyName,
+      currentPrice: technicalAnalysis.currentPrice,
+      technical: {
+        shortTerm: technicalAnalysis.shortTerm,
+        mediumTerm: technicalAnalysis.mediumTerm,
+        longTerm: technicalAnalysis.longTerm,
+        indicators: technicalAnalysis.technicalIndicators,
+      },
+      fundamentals,
+      financialData,
+      overallScore,
+      overallRecommendation,
+      investmentSummary,
+    };
+  }
+
+  /**
+   * 投資サマリーを生成
+   */
+  private generateInvestmentSummary(
+    technical: AnalysisResult,
+    fundamentals: FundamentalAnalysis,
+    financial: FinancialData,
+    recommendation: string
+  ): string[] {
+    const summary: string[] = [];
+
+    // 推奨レベルの説明
+    const recommendationTexts: { [key: string]: string } = {
+      STRONG_BUY: '強い買い推奨 - テクニカル・ファンダメンタルズともに良好',
+      BUY: '買い推奨 - 総合的に魅力的な投資対象',
+      HOLD: '保留 - 様子見が適切',
+      SELL: '売り推奨 - リスクが利益を上回る可能性',
+      STRONG_SELL: '強い売り推奨 - 投資を避けるべき',
+    };
+    summary.push(recommendationTexts[recommendation] || '');
+
+    // テクニカル面の要点
+    if (technical.longTerm.signal === 'BUY') {
+      summary.push('テクニカル面: 長期的な上昇トレンド継続中');
+    } else if (technical.longTerm.signal === 'SELL') {
+      summary.push('テクニカル面: 下降トレンドに注意が必要');
+    }
+
+    // ファンダメンタルズ面の要点
+    if (fundamentals.valuation.rating === 'UNDERVALUED') {
+      summary.push('バリュエーション: 割安水準 - 投資妙味あり');
+    } else if (fundamentals.valuation.rating === 'OVERVALUED') {
+      summary.push('バリュエーション: 割高水準 - 慎重な判断が必要');
+    }
+
+    // 財務健全性
+    if (fundamentals.financialHealth.rating === 'EXCELLENT') {
+      summary.push('財務健全性: 非常に良好 - 安定した企業基盤');
+    } else if (fundamentals.financialHealth.rating === 'POOR') {
+      summary.push('財務健全性: 懸念あり - リスク管理が重要');
+    }
+
+    // 収益性
+    if (fundamentals.profitability.rating === 'HIGH') {
+      summary.push('収益性: 高水準 - 強い収益力');
+    } else if (fundamentals.profitability.rating === 'LOW') {
+      summary.push('収益性: 低水準 - 改善が必要');
+    }
+
+    // 配当
+    if (financial.dividendYield && financial.dividendYield > 3) {
+      summary.push(`配当: ${financial.dividendYield.toFixed(2)}% - 高配当株として魅力的`);
+    }
+
+    return summary;
+  }
+
+  /**
    * 複数銘柄を分析してランキング
    */
   async analyzeMultipleStocks(symbols: string[]): Promise<AnalysisResult[]> {
@@ -85,7 +218,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
+  ): AnalysisResult['shortTerm'] {
     let score = 50;
     const reasons: string[] = [];
 
@@ -127,8 +260,7 @@ export class StockAnalyzer {
       reasons.push(`直近5日で${momentum.toFixed(1)}%下落（弱い下降モメンタム）`);
     }
 
-    // const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
-    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
@@ -139,7 +271,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
+  ): AnalysisResult['mediumTerm'] {
     let score = 50;
     const reasons: string[] = [];
 
@@ -181,8 +313,7 @@ export class StockAnalyzer {
       reasons.push('高ボラティリティ（リスク高）');
     }
 
-    // const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
-    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
@@ -193,7 +324,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
+  ): AnalysisResult['longTerm'] {
     let score = 50;
     const reasons: string[] = [];
 
@@ -246,8 +377,7 @@ export class StockAnalyzer {
       reasons.push('一貫した下降トレンド（回復待ち）');
     }
 
-    // const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
-    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
