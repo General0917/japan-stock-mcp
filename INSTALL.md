@@ -1,222 +1,184 @@
-# 日本株式分析MCPサーバー - インストール手順
+# インストールガイド
 
-## 概要
+## 対応OS
 
-このMCPサーバーは、日本株の株価データを取得・分析し、以下の機能を提供します:
-
-✅ **短期投資判断**（1ヶ月以内）- RSI、MACD、移動平均線による分析
-✅ **中期投資判断**（3-6ヶ月）- トレンド分析、ゴールデンクロス検出
-✅ **長期投資判断**（6ヶ月以上）- 年間トレンド、52週高値・安値分析
-✅ **複数銘柄比較** - 複数の株をまとめて分析・ランキング
-✅ **リアルタイム株価取得** - 現在価格と変動率の確認
-
----
+- ✅ Windows 10/11
+- ✅ macOS 12以降
+- ✅ Linux (Ubuntu 20.04以降)
 
 ## 前提条件
 
-- **Node.js 18以上** がインストールされていること
-- **Claude Desktop** または **Cline (VS Code拡張)** がインストールされていること
+### 必須
 
-Node.jsのインストール確認:
-```bash
-node --version
-# v18.0.0 以上であればOK
-```
+- **Node.js 18以上**
+  - Windows: https://nodejs.org/ からダウンロード
+  - macOS: `brew install node`
+  - Linux: `sudo apt install nodejs npm`
 
----
+### 推奨（ファンダメンタルズ分析用）
+
+- **Python 3.8以上**
+  - Windows: https://www.python.org/downloads/
+  - macOS: `brew install python3`
+  - Linux: `sudo apt install python3 python3-pip`
 
 ## インストール手順
 
-### 1. プロジェクトディレクトリに移動
+### Windows
+
+1. **ZIPファイルを解凍**
+   ```
+   japan-stock-mcp.zip を展開
+   ```
+
+2. **セットアップ実行**
+   ```cmd
+   cd japan-stock-mcp
+   setup.bat
+   ```
+
+3. **Claude Desktop設定**
+   
+   ファイルを開く: `%APPDATA%\Claude\claude_desktop_config.json`
+   
+   以下を追加:
+   ```json
+   {
+     "mcpServers": {
+       "japan-stock": {
+         "command": "node",
+         "args": ["C:\\完全な\\パス\\japan-stock-mcp\\dist\\index.js"]
+       }
+     }
+   }
+   ```
+   
+   ⚠️ **重要**: パスは絶対パスで指定してください
+   
+   例:
+   ```json
+   "args": ["C:\\Users\\YourName\\Documents\\japan-stock-mcp\\dist\\index.js"]
+   ```
+
+4. **Claude Desktopを再起動**
+
+### macOS
+
+1. **ZIPファイルを解凍**
+   ```bash
+   unzip japan-stock-mcp.zip
+   cd japan-stock-mcp
+   ```
+
+2. **セットアップ実行**
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
+
+3. **Claude Desktop設定**
+   
+   ファイルを開く: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   
+   以下を追加:
+   ```json
+   {
+     "mcpServers": {
+       "japan-stock": {
+         "command": "node",
+         "args": ["/Users/YourName/japan-stock-mcp/dist/index.js"]
+       }
+     }
+   }
+   ```
+   
+   ⚠️ **重要**: パスは絶対パスで指定してください
+
+4. **Claude Desktopを再起動**
+
+### Linux
+
+1. **ZIPファイルを解凍**
+   ```bash
+   unzip japan-stock-mcp.zip
+   cd japan-stock-mcp
+   ```
+
+2. **セットアップ実行**
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
+
+3. **Claude Desktop設定**
+   
+   ファイルを開く: `~/.config/Claude/claude_desktop_config.json`
+   
+   以下を追加:
+   ```json
+   {
+     "mcpServers": {
+       "japan-stock": {
+         "command": "node",
+         "args": ["/home/username/japan-stock-mcp/dist/index.js"]
+       }
+     }
+   }
+   ```
+
+4. **Claude Desktopを再起動**
+
+## 手動インストール
+
+自動セットアップがうまくいかない場合:
+
+### 1. Node.js依存関係
 
 ```bash
-cd japan-stock-mcp
+# Windows (PowerShell/CMD)
+npm install
+
+# macOS/Linux
+npm install
 ```
 
-### 2. セットアップスクリプトを実行
+### 2. Python依存関係（オプション）
 
 ```bash
-./setup.sh
+# Windows
+py -m pip install yfinance
+
+# macOS/Linux
+pip3 install yfinance
 ```
 
-このスクリプトが以下を自動実行します:
-- npm install（依存パッケージのインストール）
-- npm run build（TypeScriptのビルド）
-- セットアップ完了メッセージと設定方法の表示
-
----
-
-## 設定方法
-
-### 方法A: Claude Desktop での使用
-
-#### macOS の場合
-
-1. 設定ファイルを開く:
-```bash
-code ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
-
-2. 以下の内容を追加（または既存の設定にマージ）:
-```json
-{
-  "mcpServers": {
-    "japan-stock": {
-      "command": "node",
-      "args": ["/絶対パス/japan-stock-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-**重要**: `/絶対パス/` の部分を実際のプロジェクトパスに置き換えてください
-
-パスの確認方法:
-```bash
-pwd
-# 表示されたパスをコピーして使用
-```
-
-#### Windows の場合
-
-1. 設定ファイルを開く:
-```cmd
-notepad %APPDATA%\Claude\claude_desktop_config.json
-```
-
-2. 以下の内容を追加:
-```json
-{
-  "mcpServers": {
-    "japan-stock": {
-      "command": "node",
-      "args": ["C:\\Users\\YourName\\japan-stock-mcp\\dist\\index.js"]
-    }
-  }
-}
-```
-
-**重要**: パスを実際のプロジェクトパスに置き換えてください
-
-3. Claude Desktop を再起動
-
----
-
-### 方法B: Cline (VS Code拡張) での使用
-
-1. VS Code の設定を開く
-   - macOS: `Cmd + ,`
-   - Windows: `Ctrl + ,`
-
-2. 右上の「設定（JSON）を開く」アイコンをクリック
-
-3. settings.json に以下を追加:
-```json
-{
-  "mcp.servers": {
-    "japan-stock": {
-      "command": "node",
-      "args": ["/絶対パス/japan-stock-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-4. VS Code ウィンドウをリロード
-   - macOS: `Cmd + R`
-   - Windows: `Ctrl + R`
-
----
-
-## 動作確認
-
-### テスト1: インスペクターで動作確認
+### 3. ビルド
 
 ```bash
-npm run inspector
+npm run build
 ```
-
-MCPインスペクターが起動し、以下のツールが表示されるはずです:
-- get_stock_price
-- analyze_stock
-- compare_stocks
-- find_best_stocks
-- get_current_price
-
-### テスト2: Claude/Cline で実際に使用
-
-Claude Desktop または Cline を開いて、以下のように質問してください:
-
-```
-トヨタ自動車（7203）を分析してください
-```
-
-正常に動作していれば、株価データと投資判断が表示されます。
-
----
-
-## 使用例
-
-### 例1: 単一銘柄の詳細分析
-```
-ソニーグループ（6758）の短期・中期・長期の投資判断を教えてください
-```
-
-### 例2: 複数銘柄の比較
-```
-以下の銘柄を比較分析してください:
-- 7203（トヨタ自動車）
-- 6758（ソニーグループ）  
-- 9984（ソフトバンクグループ）
-```
-
-### 例3: 投資期間別の推奨銘柄
-```
-短期投資で有望な銘柄TOP5を教えてください。
-候補: 7203, 6758, 9984, 8306, 9432, 6861, 4063
-```
-
-### 例4: セクター分析
-```
-自動車セクターの主要3社（7203, 7267, 7201）を分析して、
-どの銘柄が最も有望か教えてください
-```
-
----
-
-## 主要な銘柄コード
-
-よく使われる銘柄コード（詳細は stock-symbols.md を参照）:
-
-- **7203**: トヨタ自動車
-- **6758**: ソニーグループ
-- **9984**: ソフトバンクグループ
-- **8306**: 三菱UFJフィナンシャル・グループ
-- **9432**: 日本電信電話（NTT）
-- **6861**: キーエンス
-- **7974**: 任天堂
-
----
 
 ## トラブルシューティング
 
-### Q: MCPツールが表示されない
+### Python が見つからない（Windows）
 
-A: 以下を確認してください:
-1. `dist/index.js` ファイルが存在するか（ビルドが成功しているか）
-2. 設定ファイルのパスが正しいか（絶対パスを使用）
-3. アプリケーションを完全に再起動したか
+1. Python をインストール: https://www.python.org/downloads/
+2. インストール時に "Add Python to PATH" をチェック
+3. コマンドプロンプトを再起動
+4. 確認: `py --version`
 
-### Q: 株価データが取得できない
+### Python が見つからない（macOS）
 
-A: 
-1. インターネット接続を確認
-2. 銘柄コードが正しいか確認（4桁の数字）
-3. Yahoo Finance APIがアクセス可能か確認
+```bash
+# Homebrewでインストール
+brew install python3
 
-### Q: ビルドエラーが発生する
+# 確認
+python3 --version
+```
 
-A:
+### ビルドエラー
+
 ```bash
 # node_modulesを削除して再インストール
 rm -rf node_modules package-lock.json
@@ -224,67 +186,66 @@ npm install
 npm run build
 ```
 
-### Q: Windowsでsetup.shが実行できない
+### パスの問題（Windows）
 
-A:
-```cmd
-# 手動でインストールとビルド
-npm install
-npm run build
-```
+- バックスラッシュ（\）を使用
+- パスに空白がある場合は完全パスを使用
+- 例: `C:\\Users\\Your Name\\Documents\\japan-stock-mcp\\dist\\index.js`
 
----
+### 権限エラー（macOS/Linux）
 
-## 開発者向け情報
-
-### ファイル構成
-
-```
-japan-stock-mcp/
-├── src/
-│   ├── index.ts           # MCPサーバーメイン
-│   ├── stock-api.ts       # 株価データ取得API
-│   └── stock-analyzer.ts  # 株価分析ロジック
-├── dist/                  # ビルド出力（自動生成）
-├── package.json           # 依存関係定義
-├── tsconfig.json         # TypeScript設定
-├── README.md             # プロジェクト説明
-├── QUICKSTART.md         # クイックスタート
-└── setup.sh              # セットアップスクリプト
-```
-
-### カスタマイズ
-
-分析ロジックをカスタマイズする場合:
-- `src/stock-analyzer.ts` を編集
-- `npm run build` で再ビルド
-- アプリケーションを再起動
-
-開発モード（自動再ビルド）:
 ```bash
-npm run watch
+# スクリプトに実行権限を付与
+chmod +x setup.sh
+
+# npm でグローバルインストール権限エラーの場合
+sudo npm install -g npm
 ```
 
----
+## 動作確認
 
-## 注意事項
+### MCPインスペクターで確認
 
-⚠️ **重要な免責事項**
+```bash
+npm run inspector
+```
 
-- 本ツールは**情報提供のみ**を目的としており、**投資助言ではありません**
-- 投資判断は**ご自身の責任**で行ってください
-- テクニカル分析のみに基づいており、ファンダメンタル分析は含まれていません
-- 株価データには遅延が含まれる場合があります
-- 過去のパフォーマンスは将来の結果を保証するものではありません
+ブラウザで開いて、利用可能なツールを確認できます。
 
----
+### Claude Desktopで確認
 
-## サポート・フィードバック
+Claude Desktopを開き、以下のように質問:
 
-問題が発生した場合や改善要望がある場合は、GitHubのIssuesで報告してください。
+```
+トヨタ自動車（7203）の株価データを取得してください
+```
 
----
+正常に動作すれば、株価データが表示されます。
 
-## ライセンス
+## アンインストール
 
-MIT License
+### 1. Claude Desktop設定から削除
+
+`claude_desktop_config.json` から japan-stock の設定を削除
+
+### 2. ファイル削除
+
+```bash
+# Windows
+rd /s japan-stock-mcp
+
+# macOS/Linux  
+rm -rf japan-stock-mcp
+```
+
+## サポート
+
+問題が解決しない場合:
+
+1. `TROUBLESHOOTING.md` を確認
+2. GitHub Issuesで報告
+3. 以下の情報を含める:
+   - OS バージョン
+   - Node.js バージョン (`node --version`)
+   - Python バージョン (`py --version` or `python3 --version`)
+   - エラーメッセージ全文

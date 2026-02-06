@@ -1,4 +1,4 @@
-#!/usr/bin/env py
+#!/usr/bin/env python3
 """
 日本株の財務データを取得するPythonスクリプト
 yfinanceライブラリを使用して、より信頼性の高いデータ取得を実現

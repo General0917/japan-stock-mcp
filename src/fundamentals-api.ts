@@ -3,14 +3,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { platform } from 'os';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-/** Windows では py -3、それ以外では python3 を使用 */
-const pythonCommand = platform() === 'win32' ? 'py -3' : 'python3';
 
 /**
  * 企業の財務情報
@@ -32,7 +28,7 @@ export interface FinancialData {
   netIncome?: number;           // 純利益
   totalAssets?: number;         // 総資産
   totalDebt?: number;           // 総負債
-  shareholdersEquity?: number; // 株主資本
+  shareholdersEquity?: number;  // 株主資本
 }
 
 /**
@@ -81,11 +77,11 @@ export class FundamentalsAPIClient {
         // すべて失敗した場合は、エラーメッセージを含む基本データを返す
         throw new Error(
           `財務データの取得に失敗しました。\n` +
-          `理由: Pythonスクリプトの実行に失敗したか、Yahoo Finance APIが直接利用できません（Crumb制限）。\n` +
-          `解決策:\n` +
-          `1. Pythonで手動確認: py -3 scripts\\fetch_financials.py 7779\n` +
-          `2. yfinance をインストール: py -3 -m pip install yfinance\n` +
-          `3. プロジェクトパスに日本語（例: 国内株式）があるとNodeからPythonが動かない場合があります。英語パスへ移動して試してください。`
+          `理由: Yahoo Finance APIへのアクセスが制限されている可能性があります。\n` +
+          `解決策: \n` +
+          `1. Pythonとyfinanceをインストール: pip install yfinance\n` +
+          `2. しばらく時間をおいてから再試行\n` +
+          `3. 別の銘柄で試してみる`
         );
       }
     }
@@ -93,36 +89,27 @@ export class FundamentalsAPIClient {
 
   /**
    * Pythonスクリプトを使用して財務データを取得
-   * 日本語パス対策: cwd を scripts にし、スクリプト名のみ指定して実行
    */
   private async getFinancialDataFromPython(symbol: string): Promise<FinancialData> {
-    const scriptsDir = join(__dirname, '..', 'scripts');
-    const scriptName = 'fetch_financials.py';
+    const scriptPath = join(__dirname, '..', 'scripts', 'fetch_financials.py');
+    
+    // WindowsとmacOS/Linuxの両方に対応
+    const pythonCommand = process.platform === 'win32' ? 'py' : 'python3';
     
     try {
-      const { stdout, stderr } = await execAsync(`${pythonCommand} "${scriptName}" "${symbol}"`, {
+      const { stdout } = await execAsync(`${pythonCommand} "${scriptPath}" "${symbol}"`, {
         timeout: 15000,
-        cwd: scriptsDir,
       });
       
-      // Python がエラー時に stderr に JSON を出すため、stdout が空なら stderr を試す
-      const raw = (stdout?.trim() || stderr?.trim() || '');
-      if (!raw) {
-        throw new Error('Pythonスクリプトが出力を返しませんでした');
-      }
-      
-      const data = JSON.parse(raw);
+      const data = JSON.parse(stdout);
       
       if (data.error) {
-        throw new Error(data.message ?? '不明なエラー');
+        throw new Error(data.message);
       }
       
       return data as FinancialData;
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Pythonスクリプト実行エラー: ${error.message}`);
-      }
-      throw error;
+      throw new Error(`Pythonスクリプト実行エラー: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -150,13 +137,8 @@ export class FundamentalsAPIClient {
         timeout: 10000,
       });
 
-      const summary = response.data?.quoteSummary;
-      if (!summary || !summary.result) {
-        const err = summary?.error || response.data?.finance?.error;
-        const msg = err?.description?.includes('Crumb') || err?.code === 'Unauthorized'
-          ? 'Yahoo Finance API は認証(Crumb)のため直接利用できません。Python/yfinance で取得してください。'
-          : '財務データが利用できません';
-        throw new Error(msg);
+      if (!response.data.quoteSummary || !response.data.quoteSummary.result) {
+        throw new Error('財務データが利用できません');
       }
 
       const result = response.data.quoteSummary.result[0];
@@ -267,7 +249,7 @@ export class FundamentalsAPIClient {
     const reasons: string[] = [];
 
     // 負債比率（低いほど良い）
-    if (data.debtToEquity != null) {
+    if (data.debtToEquity !== undefined && data.debtToEquity !== null) {
       if (data.debtToEquity < 50) {
         score += 15;
         reasons.push(`負債比率 ${data.debtToEquity.toFixed(1)}% - 非常に健全`);
@@ -284,7 +266,7 @@ export class FundamentalsAPIClient {
     }
 
     // 流動比率（高いほど良い）
-    if (data.currentRatio != null) {
+    if (data.currentRatio !== undefined && data.currentRatio !== null) {
       if (data.currentRatio > 2.0) {
         score += 15;
         reasons.push(`流動比率 ${data.currentRatio.toFixed(2)} - 優秀な短期支払能力`);
@@ -301,7 +283,7 @@ export class FundamentalsAPIClient {
     }
 
     // ROE（高いほど良い）
-    if (data.roe != null) {
+    if (data.roe !== undefined && data.roe !== null) {
       if (data.roe > 15) {
         score += 10;
         reasons.push(`ROE ${data.roe.toFixed(1)}% - 高い資本効率`);
@@ -333,7 +315,7 @@ export class FundamentalsAPIClient {
     const reasons: string[] = [];
 
     // PER分析（業種平均を15として評価）
-    if (data.per != null) {
+    if (data.per !== undefined && data.per !== null) {
       if (data.per < 0) {
         score -= 20;
         reasons.push(`PER ${data.per.toFixed(1)} - 赤字企業（リスク高）`);
@@ -356,7 +338,7 @@ export class FundamentalsAPIClient {
     }
 
     // PBR分析（1.0を基準）
-    if (data.pbr != null) {
+    if (data.pbr !== undefined && data.pbr !== null) {
       if (data.pbr < 0.8) {
         score += 15;
         reasons.push(`PBR ${data.pbr.toFixed(2)} - 資産価値から見て割安`);
@@ -375,7 +357,7 @@ export class FundamentalsAPIClient {
     }
 
     // 配当利回り分析
-    if (data.dividendYield != null && data.dividendYield > 0) {
+    if (data.dividendYield !== undefined && data.dividendYield > 0) {
       if (data.dividendYield > 4.0) {
         score += 10;
         reasons.push(`配当利回り ${data.dividendYield.toFixed(2)}% - 高配当`);
@@ -403,7 +385,7 @@ export class FundamentalsAPIClient {
     const reasons: string[] = [];
 
     // 営業利益率
-    if (data.operatingMargin != null) {
+    if (data.operatingMargin !== undefined && data.operatingMargin !== null) {
       if (data.operatingMargin > 15) {
         score += 15;
         reasons.push(`営業利益率 ${data.operatingMargin.toFixed(1)}% - 非常に高い収益性`);
@@ -422,7 +404,7 @@ export class FundamentalsAPIClient {
     }
 
     // 純利益率
-    if (data.profitMargin != null) {
+    if (data.profitMargin !== undefined && data.profitMargin !== null) {
       if (data.profitMargin > 10) {
         score += 15;
         reasons.push(`純利益率 ${data.profitMargin.toFixed(1)}% - 優秀な最終利益`);
@@ -439,7 +421,7 @@ export class FundamentalsAPIClient {
     }
 
     // EPS（1株当たり利益）
-    if (data.eps != null) {
+    if (data.eps !== undefined && data.eps !== null) {
       if (data.eps > 100) {
         score += 10;
         reasons.push(`EPS ${data.eps.toFixed(0)}円 - 高い利益水準`);

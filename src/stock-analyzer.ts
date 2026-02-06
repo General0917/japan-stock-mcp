@@ -218,7 +218,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): AnalysisResult['shortTerm'] {
+  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
     let score = 50;
     const reasons: string[] = [];
 
@@ -260,7 +260,7 @@ export class StockAnalyzer {
       reasons.push(`直近5日で${momentum.toFixed(1)}%下落（弱い下降モメンタム）`);
     }
 
-    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
@@ -271,7 +271,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): AnalysisResult['mediumTerm'] {
+  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
     let score = 50;
     const reasons: string[] = [];
 
@@ -313,7 +313,7 @@ export class StockAnalyzer {
       reasons.push('高ボラティリティ（リスク高）');
     }
 
-    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
@@ -324,7 +324,7 @@ export class StockAnalyzer {
     data: StockPrice[],
     indicators: TechnicalIndicators,
     currentPrice: number
-  ): AnalysisResult['longTerm'] {
+  ): { signal: 'BUY' | 'SELL' | 'HOLD'; score: number; reasons: string[] } {
     let score = 50;
     const reasons: string[] = [];
 
@@ -377,7 +377,7 @@ export class StockAnalyzer {
       reasons.push('一貫した下降トレンド（回復待ち）');
     }
 
-    const signal = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
+    const signal: 'BUY' | 'SELL' | 'HOLD' = score >= 60 ? 'BUY' : score <= 40 ? 'SELL' : 'HOLD';
     return { signal, score, reasons };
   }
 
@@ -407,5 +407,77 @@ export class StockAnalyzer {
     }
 
     return consistentCount >= quarters * 0.7; // 70%以上の期間でトレンド継続
+  }
+
+  /**
+   * 複数銘柄の比較
+   */
+  async compareStocks(symbols: string[]): Promise<Array<{
+    symbol: string;
+    shortTerm: number;
+    mediumTerm: number;
+    longTerm: number;
+  }>> {
+    const results = [];
+
+    for (const symbol of symbols) {
+      try {
+        const analysis = await this.analyzeStock(symbol);
+        results.push({
+          symbol,
+          shortTerm: analysis.shortTerm.score,
+          mediumTerm: analysis.mediumTerm.score,
+          longTerm: analysis.longTerm.score,
+        });
+      } catch (error) {
+        console.error(`${symbol}の分析に失敗:`, error);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * 投資期間別の最適銘柄を検索
+   */
+  async findBestStocks(
+    symbols: string[],
+    timeframe: 'short' | 'medium' | 'long',
+    topN: number = 5
+  ): Promise<Array<{ symbol: string; score: number; reason: string }>> {
+    const analyses = [];
+
+    for (const symbol of symbols) {
+      try {
+        const analysis = await this.analyzeStock(symbol);
+        let score: number;
+        let reason: string;
+
+        switch (timeframe) {
+          case 'short':
+            score = analysis.shortTerm.score;
+            reason = analysis.shortTerm.reasons[0] || '短期分析結果';
+            break;
+          case 'medium':
+            score = analysis.mediumTerm.score;
+            reason = analysis.mediumTerm.reasons[0] || '中期分析結果';
+            break;
+          case 'long':
+            score = analysis.longTerm.score;
+            reason = analysis.longTerm.reasons[0] || '長期分析結果';
+            break;
+        }
+
+        analyses.push({ symbol, score, reason });
+      } catch (error) {
+        console.error(`${symbol}の分析に失敗:`, error);
+      }
+    }
+
+    // スコア順にソート
+    analyses.sort((a, b) => b.score - a.score);
+
+    // 上位N件を返す
+    return analyses.slice(0, topN);
   }
 }

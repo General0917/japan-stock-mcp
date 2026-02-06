@@ -20,27 +20,46 @@ echo ""
 echo "2. Python依存パッケージをインストール中..."
 echo "   (ファンダメンタルズ分析に必要)"
 
+# OSを検出
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+    # Windows
+    PYTHON_CMD="py"
+    PIP_CMD="py -m pip"
+else
+    # macOS/Linux
+    PYTHON_CMD="python3"
+    PIP_CMD="pip3"
+fi
+
 # Pythonがインストールされているか確認
-if command -v python3 &> /dev/null; then
-    echo "   Python3が見つかりました"
+if command -v $PYTHON_CMD &> /dev/null; then
+    echo "   Python が見つかりました"
     
     # yfinanceをインストール
-    pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt
+    $PIP_CMD install -r requirements.txt --break-system-packages 2>/dev/null || $PIP_CMD install -r requirements.txt
     
     if [ $? -eq 0 ]; then
         echo "   ✓ yfinanceのインストールに成功しました"
     else
         echo "   ⚠ yfinanceのインストールに失敗しました"
-        echo "   手動でインストールしてください: pip3 install yfinance"
-        echo "   （ファンダメンタルズ分析は利用できますが、精度が低下する可能性があります）"
+        echo "   手動でインストールしてください:"
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+            echo "   py -m pip install yfinance"
+        else
+            echo "   pip3 install yfinance"
+        fi
     fi
 else
-    echo "   ⚠ Python3が見つかりません"
-    echo "   ファンダメンタルズ分析を使用するには、Python3とyfinanceが必要です"
+    echo "   ⚠ Python が見つかりません"
+    echo "   ファンダメンタルズ分析を使用するには、Pythonが必要です"
     echo "   インストール方法:"
-    echo "   - macOS: brew install python3"
-    echo "   - Ubuntu: sudo apt install python3 python3-pip"
-    echo "   その後: pip3 install yfinance"
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+        echo "   - Windows: https://www.python.org/downloads/"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "   - macOS: brew install python3"
+    else
+        echo "   - Linux: sudo apt install python3 python3-pip"
+    fi
 fi
 
 echo ""
@@ -60,8 +79,11 @@ echo "----------------------------------------"
 echo "1. Claude Desktop または Cline の設定ファイルに以下を追加してください:"
 echo ""
 echo "【Claude Desktop の場合】"
-echo "ファイル: ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)"
-echo "または: %APPDATA%\\Claude\\claude_desktop_config.json (Windows)"
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+    echo "ファイル: %APPDATA%\\Claude\\claude_desktop_config.json"
+else
+    echo "ファイル: ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)"
+fi
 echo ""
 echo '{'
 echo '  "mcpServers": {'
@@ -91,5 +113,4 @@ echo "   npm run inspector"
 echo ""
 echo "使用例:"
 echo "  「トヨタ自動車（7203）を総合分析してください」"
-echo "  「ソニーグループ（6758）のファンダメンタルズを分析してください」"
 echo "========================================"
