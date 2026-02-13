@@ -215,7 +215,7 @@ export class SectorAnalyzer {
     // PER
     if (criteria.per) {
       totalCriteria++;
-      if (data.per !== undefined) {
+      if (data.per !== undefined && data.per !== null) {
         const min = criteria.per.min ?? -Infinity;
         const max = criteria.per.max ?? Infinity;
         if (data.per >= min && data.per <= max) {
@@ -228,7 +228,7 @@ export class SectorAnalyzer {
     // PBR
     if (criteria.pbr) {
       totalCriteria++;
-      if (data.pbr !== undefined) {
+      if (data.pbr !== undefined && data.pbr !== null) {
         const min = criteria.pbr.min ?? -Infinity;
         const max = criteria.pbr.max ?? Infinity;
         if (data.pbr >= min && data.pbr <= max) {
@@ -241,7 +241,7 @@ export class SectorAnalyzer {
     // ROE
     if (criteria.roe) {
       totalCriteria++;
-      if (data.roe !== undefined) {
+      if (data.roe !== undefined && data.roe !== null) {
         const min = criteria.roe.min ?? -Infinity;
         const max = criteria.roe.max ?? Infinity;
         if (data.roe >= min && data.roe <= max) {
@@ -254,7 +254,7 @@ export class SectorAnalyzer {
     // 配当利回り
     if (criteria.dividendYield) {
       totalCriteria++;
-      if (data.dividendYield !== undefined) {
+      if (data.dividendYield !== undefined && data.dividendYield !== null) {
         const min = criteria.dividendYield.min ?? -Infinity;
         const max = criteria.dividendYield.max ?? Infinity;
         if (data.dividendYield >= min && data.dividendYield <= max) {
@@ -267,7 +267,7 @@ export class SectorAnalyzer {
     // 時価総額
     if (criteria.marketCap) {
       totalCriteria++;
-      if (data.marketCap !== undefined) {
+      if (data.marketCap !== undefined && data.marketCap !== null) {
         const min = criteria.marketCap.min ?? -Infinity;
         const max = criteria.marketCap.max ?? Infinity;
         if (data.marketCap >= min && data.marketCap <= max) {
@@ -280,7 +280,7 @@ export class SectorAnalyzer {
     // 負債比率
     if (criteria.debtToEquity) {
       totalCriteria++;
-      if (data.debtToEquity !== undefined) {
+      if (data.debtToEquity !== undefined && data.debtToEquity !== null) {
         const min = criteria.debtToEquity.min ?? -Infinity;
         const max = criteria.debtToEquity.max ?? Infinity;
         if (data.debtToEquity >= min && data.debtToEquity <= max) {
@@ -293,7 +293,7 @@ export class SectorAnalyzer {
     // 営業利益率
     if (criteria.operatingMargin) {
       totalCriteria++;
-      if (data.operatingMargin !== undefined) {
+      if (data.operatingMargin !== undefined && data.operatingMargin !== null) {
         const min = criteria.operatingMargin.min ?? -Infinity;
         const max = criteria.operatingMargin.max ?? Infinity;
         if (data.operatingMargin >= min && data.operatingMargin <= max) {

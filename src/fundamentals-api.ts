@@ -14,21 +14,21 @@ const __dirname = dirname(__filename);
 export interface FinancialData {
   symbol: string;
   companyName: string;
-  marketCap?: number;           // 時価総額
-  per?: number;                 // 株価収益率 (Price Earnings Ratio)
-  pbr?: number;                 // 株価純資産倍率 (Price Book Ratio)
-  eps?: number;                 // 1株当たり利益 (Earnings Per Share)
-  dividendYield?: number;       // 配当利回り
-  roe?: number;                 // 自己資本利益率 (Return On Equity)
-  debtToEquity?: number;        // 負債比率
-  currentRatio?: number;        // 流動比率
-  operatingMargin?: number;     // 営業利益率
-  profitMargin?: number;        // 純利益率
-  revenue?: number;             // 売上高
-  netIncome?: number;           // 純利益
-  totalAssets?: number;         // 総資産
-  totalDebt?: number;           // 総負債
-  shareholdersEquity?: number;  // 株主資本
+  marketCap?: number | null;           // 時価総額
+  per?: number | null;                 // 株価収益率 (Price Earnings Ratio)
+  pbr?: number | null;                 // 株価純資産倍率 (Price Book Ratio)
+  eps?: number | null;                 // 1株当たり利益 (Earnings Per Share)
+  dividendYield?: number | null;       // 配当利回り
+  roe?: number | null;                 // 自己資本利益率 (Return On Equity)
+  debtToEquity?: number | null;        // 負債比率
+  currentRatio?: number | null;        // 流動比率
+  operatingMargin?: number | null;     // 営業利益率
+  profitMargin?: number | null;        // 純利益率
+  revenue?: number | null;             // 売上高
+  netIncome?: number | null;           // 純利益
+  totalAssets?: number | null;         // 総資産
+  totalDebt?: number | null;           // 総負債
+  shareholdersEquity?: number | null;  // 株主資本
 }
 
 /**
@@ -357,7 +357,7 @@ export class FundamentalsAPIClient {
     }
 
     // 配当利回り分析
-    if (data.dividendYield !== undefined && data.dividendYield > 0) {
+    if (data.dividendYield !== undefined && data.dividendYield !== null && data.dividendYield > 0) {
       if (data.dividendYield > 4.0) {
         score += 10;
         reasons.push(`配当利回り ${data.dividendYield.toFixed(2)}% - 高配当`);
